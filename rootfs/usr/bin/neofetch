@@ -1,5 +1,5 @@
 #!/bin/sh
-# Minimal zero-dependency Neofetch for Nano Alpine Linux
+# Exact Neofetch for Alpine Linux
 
 BLUE='\033[1;34m'
 CYAN='\033[1;36m'
@@ -21,7 +21,7 @@ if [ -f /proc/meminfo ]; then
     MEM_TOTAL_MB=$(( MEM_TOTAL_KB / 1024 ))
     MEM_STR="${MEM_USED_MB}MiB / ${MEM_TOTAL_MB}MiB"
 else
-    MEM_STR="128MiB"
+    MEM_STR="128MiB / 128MiB"
 fi
 
 if [ -f /proc/uptime ]; then
@@ -52,15 +52,28 @@ while [ $i -lt $LINE_LEN ]; do
     i=$((i + 1))
 done
 
-printf "       ${BLUE}/\\${RESET}        %b\n" "$USER_HOST"
-printf "      ${BLUE}/  \\${RESET}       %s\n" "$DASHES"
-printf "     ${BLUE}/ ${WHITE}/\\${BLUE} \\${RESET}      ${BOLD}${BLUE}OS${RESET}: Alpine Linux x86_64\n"
-printf "    ${BLUE}/ ${WHITE}/  \\${BLUE} \\${RESET}     ${BOLD}${BLUE}Host${RESET}: QEMU Standard PC (i440FX + PIIX, 1996)\n"
-printf "   ${BLUE}/ ${WHITE}/    \\${BLUE} \\${RESET}    ${BOLD}${BLUE}Kernel${RESET}: ${KERNEL}\n"
-printf "  ${BLUE}/ ${WHITE}/      \\${BLUE} \\${RESET}   ${BOLD}${BLUE}Uptime${RESET}: ${UPTIME}\n"
-printf " / ${WHITE}/        \\${BLUE} \\${RESET}  ${BOLD}${BLUE}Packages${RESET}: ${PKGS}\n"
-printf "${BLUE}/ ${WHITE}/          \\${BLUE} \\${RESET} ${BOLD}${BLUE}Shell${RESET}: sh\n"
-printf "${BLUE}\\/            \\/${RESET} ${BOLD}${BLUE}Memory${RESET}: ${MEM_STR}\n"
-printf "\n"
-printf "   \033[40m   \033[41m   \033[42m   \033[43m   \033[44m   \033[45m   \033[46m   \033[47m   \033[0m\n"
-printf "   \033[100m   \033[101m   \033[102m   \033[103m   \033[104m   \033[105m   \033[106m   \033[107m   \033[0m\n"
+# ANSI Color Blocks
+CB1="\033[40m   \033[41m   \033[42m   \033[43m   \033[44m   \033[45m   \033[46m   \033[47m   \033[0m"
+CB2="\033[100m   \033[101m   \033[102m   \033[103m   \033[104m   \033[105m   \033[106m   \033[107m   \033[0m"
+
+# Print side-by-side exact Alpine ASCII logo and system information
+printf "${BLUE}       .hddddddddddddddddddddddh.       ${RESET}%b\n" "$USER_HOST"
+printf "${BLUE}     :dddddddddddddddddddddddddddd:     ${RESET}%s\n" "$DASHES"
+printf "${BLUE}    /dddddddddddddddddddddddddddddd/    ${RESET}${BOLD}${BLUE}OS${RESET}: Alpine Linux x86_64\n"
+printf "${BLUE}   +dddddddddddddddddddddddddddddddd+   ${RESET}${BOLD}${BLUE}Host${RESET}: QEMU Standard PC (i440FX + PIIX, 1996)\n"
+printf "${BLUE}  \`sdddddddddddddddddddddddddddddddds\`  ${RESET}${BOLD}${BLUE}Kernel${RESET}: ${KERNEL}\n"
+printf "${BLUE} \`ydddddddddddd++hdddddddddddddddddddy\` ${RESET}${BOLD}${BLUE}Uptime${RESET}: ${UPTIME}\n"
+printf "${BLUE}.hdddddddddd+\`   \`+dddh:-sdddddddddddh. ${RESET}${BOLD}${BLUE}Packages${RESET}: ${PKGS}\n"
+printf "${BLUE}hddddddddd+\`       \`+y:   .sddddddddddh ${RESET}${BOLD}${BLUE}Shell${RESET}: sh\n"
+printf "${BLUE}ddddddddh+\`   '//\`          -sddddddddd ${RESET}${BOLD}${BLUE}Memory${RESET}: ${MEM_STR}\n"
+printf "${BLUE}ddddddh+\`   /hddh/\`   \`:s-    -sddddddd ${RESET}\n"
+printf "${BLUE}ddddh+\`   /+/ddddh/\`   \`+s-    -sddddd  ${RESET}%b\n" "$CB1"
+printf "${BLUE}ddd+\`   '/o\` :ddddddh/\`   \`oy-    .yddd ${RESET}%b\n" "$CB2"
+printf "${BLUE}hdddyo+ohddyosddddddddho+oyddy++ohdddh  ${RESET}\n"
+printf "${BLUE}.hddddddddddddddddddddddddddddddddddh.  ${RESET}\n"
+printf "${BLUE} \`yddddddddddddddddddddddddddddddddy\`  ${RESET}\n"
+printf "${BLUE}  \`sdddddddddddddddddddddddddddddds\`   ${RESET}\n"
+printf "${BLUE}   +dddddddddddddddddddddddddddddd+    ${RESET}\n"
+printf "${BLUE}    /dddddddddddddddddddddddddddd/     ${RESET}\n"
+printf "${BLUE}     :dddddddddddddddddddddddddd:      ${RESET}\n"
+printf "${BLUE}       .hddddddddddddddddddddh.         ${RESET}\n"
