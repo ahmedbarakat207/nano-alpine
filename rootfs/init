@@ -1,0 +1,28 @@
+#!/bin/sh
+
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin
+
+# Mount essential virtual filesystems
+mount -t proc none /proc 2>/dev/null
+mount -t sysfs none /sys 2>/dev/null
+mount -t devtmpfs none /dev 2>/dev/null
+mkdir -p /dev/pts /tmp
+mount -t devpts none /dev/pts 2>/dev/null
+mount -t tmpfs none /tmp 2>/dev/null
+
+echo "=========================================="
+echo "         Welcome to Alpine Linux          "
+echo "=========================================="
+
+# Loop shell with cttyhack so exiting shell doesn't panic the kernel
+while true; do
+    if [ -x /bin/cttyhack ]; then
+        exec /bin/cttyhack /bin/sh
+    elif [ -x /usr/bin/cttyhack ]; then
+        exec /usr/bin/cttyhack /bin/sh
+    else
+        /bin/sh
+    fi
+    echo "Shell exited, restarting in 1 sec..."
+    sleep 1
+done
