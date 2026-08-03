@@ -4,6 +4,13 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+if [ "$1" = "clean" ] || [ "$1" = "--clean" ]; then
+    echo "Cleaning build artifacts..."
+    rm -rf static_rootfs .syslinux initrd.cpio.xz linux.iso busybox-static rootfs.tar *.log
+    echo "Clean complete."
+    exit 0
+fi
+
 echo "=== Building Nano-Alpine Minimal Linux ISO ==="
 
 # 1. Ensure kernel bzImage is present
@@ -44,7 +51,7 @@ chmod +x static_rootfs/init static_rootfs/sbin/apk static_rootfs/usr/bin/neofetc
 
 # Symlink core shell tools & neofetch
 cd static_rootfs/bin
-for app in sh ls cat echo cp mv rm mkdir rmdir mount umount ps kill vi tar gzip gunzip zcat grep egrep fgrep sed awk wget ping cttyhack clear dmesg reboot halt poweroff touch chmod chown find xargs head tail wc cut tr uniq sort env pwd uname hostname id whoami date uptime sleep sync ip ifconfig udhcpc route; do
+for app in sh ls cat echo cp mv rm mkdir rmdir mount umount ps kill vi tar gzip gunzip zcat grep egrep fgrep sed awk wget ping cttyhack clear dmesg reboot halt poweroff touch chmod chown find xargs head tail wc cut tr uniq sort env pwd uname hostname id whoami date uptime sleep sync ip ifconfig udhcpc route free; do
     ln -s busybox $app 2>/dev/null || true
 done
 ln -s ../usr/bin/neofetch neofetch 2>/dev/null || true
