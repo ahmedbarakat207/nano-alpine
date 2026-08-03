@@ -100,7 +100,7 @@ CB2="\033[100m   \033[101m   \033[102m   \033[103m   \033[104m   \033[105m   \03
 # Print side-by-side exact Alpine ASCII logo and system information
 printf "${BLUE}       .hddddddddddddddddddddddh.       ${RESET}%b\n" "$USER_HOST"
 printf "${BLUE}     :dddddddddddddddddddddddddddd:     ${RESET}%s\n" "$DASHES"
-printf "${BLUE}    /dddddddddddddddddddddddddddddd/    ${RESET}${BOLD}${BLUE}OS${RESET}: Alpine Linux x86_64\n"
+printf "${BLUE}    /dddddddddddddddddddddddddddddd/    ${RESET}${BOLD}${BLUE}OS${RESET}: Alpine Linux i386\n"
 printf "${BLUE}   +dddddddddddddddddddddddddddddddd+   ${RESET}${BOLD}${BLUE}Host${RESET}: ${HOST_MODEL}\n"
 printf "${BLUE}  \`sdddddddddddddddddddddddddddddddds\`  ${RESET}${BOLD}${BLUE}Kernel${RESET}: ${KERNEL}\n"
 printf "${BLUE} \`ydddddddddddd++hdddddddddddddddddddy\` ${RESET}${BOLD}${BLUE}Uptime${RESET}: ${UPTIME}\n"
