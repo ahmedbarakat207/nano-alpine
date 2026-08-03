@@ -1,90 +1,39 @@
 #!/usr/bin/env python3
-import io
+"""
+make_iso.py - Build bootable ISO for Nano-Alpine Linux using custom MBR/El Torito bootloader.
+Eliminates all dependencies on syslinux / isolinux.
+"""
 import os
 import sys
 import pycdlib
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-def find_file(candidates, name):
-    for path in candidates:
-        if os.path.exists(path):
-            return path
-    raise FileNotFoundError(f"Could not find required bootloader file '{name}'. Checked: {candidates}")
+arch = os.environ.get("TARGET_ARCH", "x86_64")
+if os.environ.get("KERNEL_BIN") == "bzImage_i386":
+    arch = "i386"
 
-isolinux_candidates = [
-    os.path.join(ROOT_DIR, ".syslinux", "isolinux.bin"),
-    "/tmp/syslinux-6.03/bios/core/isolinux.bin",
-    "/usr/lib/ISOLINUX/isolinux.bin",
-    "/usr/lib/syslinux/isolinux.bin",
-    "/usr/lib/syslinux/bios/isolinux.bin",
-    "/usr/share/syslinux/isolinux.bin",
-]
+img_name = f"nano_{arch}.img"
+img_path = os.path.join(ROOT_DIR, img_name)
+output_iso_path = os.path.join(ROOT_DIR, f"linux_{arch}.iso" if arch == "i386" else "linux.iso")
 
-ldlinux_candidates = [
-    os.path.join(ROOT_DIR, ".syslinux", "ldlinux.c32"),
-    "/tmp/syslinux-6.03/bios/com32/elflink/ldlinux/ldlinux.c32",
-    "/usr/lib/syslinux/modules/bios/ldlinux.c32",
-    "/usr/lib/syslinux/ldlinux.c32",
-    "/usr/lib/syslinux/bios/ldlinux.c32",
-    "/usr/share/syslinux/ldlinux.c32",
-]
+if not os.path.exists(img_path):
+    sys.exit(f"Error: Raw disk image missing at {img_path}. Please run build.sh / patch_lba.py first.")
 
-isolinux_bin = find_file(isolinux_candidates, "isolinux.bin")
-ldlinux_c32 = find_file(ldlinux_candidates, "ldlinux.c32")
-
-kernel_bin_name = os.environ.get("KERNEL_BIN", "bzImage")
-if not os.path.exists(os.path.join(ROOT_DIR, kernel_bin_name)) and os.path.exists(os.path.join(ROOT_DIR, "bzImage_i386")):
-    kernel_bin_name = "bzImage_i386"
-
-bzimage_path = os.path.join(ROOT_DIR, kernel_bin_name)
-initrd_path = os.path.join(ROOT_DIR, "initrd.cpio.xz")
-output_iso_path = os.path.join(ROOT_DIR, "linux.iso")
-
-if not os.path.exists(bzimage_path):
-    sys.exit(f"Error: Kernel binary missing at {bzimage_path}. Please run build.sh first.")
-
-if not os.path.exists(initrd_path):
-    sys.exit(f"Error: Initrd missing at {initrd_path}. Please run build.sh first.")
+img_size = os.path.getsize(img_path)
+sectors = img_size // 512
 
 iso = pycdlib.PyCdlib()
 iso.new(interchange_level=3, joliet=True, rock_ridge='1.12')
 
-# Create ISOLINUX directory
-iso.add_directory('/ISOLINUX', rr_name='isolinux')
+# Add raw disk image to ISO as El Torito floppy boot file (1.44MB or 2.88MB floppy emulation)
+iso.add_file(img_path, '/NANO.IMG;1', rr_name='nano.img')
+if sectors in (2400, 2880, 5760):
+    iso.add_eltorito('/NANO.IMG;1', bootcatfile='/BOOT.CAT;1', media_name='floppy', boot_load_size=sectors)
+else:
+    iso.add_eltorito('/NANO.IMG;1', bootcatfile='/BOOT.CAT;1', media_name='noemul', boot_load_size=4)
 
-# Add bootloader files in isolinux directory
-iso.add_file(isolinux_bin, '/ISOLINUX/ISOLINUX.BIN;1', rr_name='isolinux.bin')
-iso.add_file(ldlinux_c32, '/ISOLINUX/LDLINUX.C32;1', rr_name='ldlinux.c32')
-
-# Write isolinux.cfg with auto-boot and serial fallback option
-cfg_content = b"""DEFAULT linux
-PROMPT 0
-TIMEOUT 10
-
-LABEL linux
-  MENU LABEL Nano Alpine Linux (VGA Console)
-  KERNEL /bzImage
-  INITRD /initrd.cpio.xz
-  APPEND console=tty0 quiet
-
-LABEL serial
-  MENU LABEL Nano Alpine Linux (Serial Console)
-  KERNEL /bzImage
-  INITRD /initrd.cpio.xz
-  APPEND console=ttyS0,115200 quiet
-"""
-iso.add_fp(io.BytesIO(cfg_content), len(cfg_content), '/ISOLINUX/ISOLINUX.CFG;1', rr_name='isolinux.cfg')
-
-# Add kernel and initrd in ISO root
-iso.add_file(bzimage_path, '/BZIMAGE.;1', rr_name='bzImage')
-iso.add_file(initrd_path, '/INITRD.XZ;1', rr_name='initrd.cpio.xz')
-
-# Add El Torito boot entry using isolinux.bin
-iso.add_eltorito('/ISOLINUX/ISOLINUX.BIN;1', bootcatfile='/ISOLINUX/BOOT.CAT;1', boot_info_table=True)
-
-# Write ISO file
 iso.write(output_iso_path)
 iso.close()
 
-print(f"ISO successfully created: {output_iso_path}")
+print(f"ISO successfully created using custom bootloader: {output_iso_path}")

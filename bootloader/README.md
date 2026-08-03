@@ -1,65 +1,47 @@
-# Bootloader
+# Nano-Alpine Two-Stage MBR Bootloader
 
-Custom 512-byte MBR bootloaders for Nano-Alpine Linux. Replaces ISOLINUX for
-raw disk image booting (`nano.img`) instead of ISO format.
+Custom two-stage MBR bootloaders for Nano-Alpine Linux. Replaces ISOLINUX for raw disk image booting (`nano_x86_64.img` / `nano_i386.img`).
 
 ## Files
 
 | File | Description |
 |------|-------------|
-| `boot_x86_64.asm` | 64-bit bootloader — loads `bzImage` (x86_64) + initrd to 1 MiB / 2 MiB |
-| `boot_i386.asm` | 32-bit bootloader — loads `bzImage` (i386) + initrd to 1 MiB / 4 MiB |
-| `patch_lba.py` | Python tool that patches LBA offsets and builds the final raw disk image |
-| `Makefile` | Builds `.bin` binaries and optionally raw disk images |
+| `stage1_x86_64.asm` | 512-byte MBR Stage 1 (x86_64) — loads Stage 2 via CHS |
+| `stage2_x86_64.asm` | Stage 2 Loader (x86_64) — A20, Unreal Mode, loads kernel & initrd to 1MB/32MB |
+| `stage1_i386.asm` | 512-byte MBR Stage 1 (i386) — loads Stage 2 via CHS |
+| `stage2_i386.asm` | Stage 2 Loader (i386) — A20, Unreal Mode, loads kernel & initrd to 1MB/32MB |
+| `patch_lba.py` | Python tool that calculates LBA offsets and builds the raw disk image |
+| `Makefile` | Assembles stage1 and stage2 binaries |
 
-## Architecture Differences
+## Memory Mapping
 
-| Feature | `boot_x86_64.asm` | `boot_i386.asm` |
-|---------|-------------------|-----------------|
-| Kernel target | 64-bit (long mode) | 32-bit (protected mode) |
-| Initrd load address | **2 MiB** (0x200000) | **4 MiB** (0x400000) |
-| Initrd DAP | EDD 2.0 (24-byte, 64-bit addr) | Standard DAP (16-byte, seg:off) |
-| Kernel entry | `0x9020:0000` | `0x9020:0000` |
+| Component | Target Address | Notes |
+|-----------|----------------|-------|
+| Stage 1 | `0x7C00` | MBR (Sector 0) |
+| Stage 2 | `0x0600` | Sectors 1–4 |
+| Bounce Buffer | `0x10000` | Conventional RAM (64 KB) for 32 KB chunk transfers |
+| Kernel Setup | `0x90000` | Real-mode kernel header and setup code |
+| Kernel Command Line | `0x98000` | `console=ttyS0 quiet` |
+| Kernel Payload | `0x100000` (1 MiB) | Extended RAM |
+| InitRD Payload | `0x02000000` (32 MiB) | Extended RAM |
 
 ## Build
 
 ```bash
-# Install NASM
-sudo apt-get install nasm
-
-# Build both bootloader binaries
+# Build bootloader binaries
 make -C bootloader
 
-# Build x86_64 raw disk image (requires ../bzImage and ../initrd.cpio.xz)
+# Build x86_64 raw disk image
 make -C bootloader disk_x86_64
 
-# Build i386 raw disk image (requires ../bzImage_i386 and ../initrd.cpio.xz)
+# Build i386 raw disk image
 make -C bootloader disk_i386
 ```
 
-## Disk Layout
-
-```
-Sector 0 (512B):  Bootloader MBR (boot_*.bin with patched LBA fields)
-Sector 1+:        bzImage (kernel)
-After kernel:     initrd.cpio.xz
-```
-
-## Patching Manually
-
-Use `patch_lba.py` to build the full image automatically:
+## Running
 
 ```bash
-python3 bootloader/patch_lba.py \
-  --boot  bootloader/boot_x86_64.bin \
-  --kernel bzImage \
-  --initrd initrd.cpio.xz \
-  --output nano.img
-```
-
-Then boot with QEMU:
-
-```bash
-qemu-system-x86_64 -drive format=raw,file=nano.img -m 128M
-qemu-system-i386   -drive format=raw,file=nano_i386.img -m 128M
+# Boot using run.sh script:
+./run.sh x86_64 -n
+./run.sh i386 -n
 ```

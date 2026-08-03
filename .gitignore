@@ -12,10 +12,22 @@ linux-7.1.6/
 alpine-minirootfs-*.tar.gz
 linux.tar.xz
 *.iso
+*.img
+*.bin
+*.lst
 *.xz
 *.gz
+*.tar
 *.log
 __pycache__/
+
+# Runtime temp mount directories inside rootfs
+rootfs/dev/
+rootfs/tmp/
+rootfs/var/
+rootfs_i386/dev/
+rootfs_i386/tmp/
+rootfs_i386/var/
 
 # Linux kernel source submodule build outputs
 src/linux/

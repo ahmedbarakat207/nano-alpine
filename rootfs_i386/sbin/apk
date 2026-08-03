@@ -4,7 +4,11 @@
 DB_DIR="/var/lib/apk_mini"
 DB_INSTALLED="$DB_DIR/installed"
 MIRROR_BASE="http://dl-cdn.alpinelinux.org/alpine/v3.20"
-ARCH="x86_64"
+
+ARCH=$(uname -m 2>/dev/null || echo x86_64)
+case "$ARCH" in
+    i?86) ARCH="x86" ;;
+esac
 
 mkdir -p "$DB_DIR" /tmp 2>/dev/null
 touch "$DB_INSTALLED" 2>/dev/null
@@ -17,7 +21,7 @@ usage() {
 fetch_index() {
     FORCE="$1"
     if [ "$FORCE" = "1" ] || [ ! -s /tmp/APKINDEX_main ] || [ ! -s /tmp/APKINDEX_comm ]; then
-        echo "Updating Alpine package indices..."
+        echo "Updating Alpine package indices ($ARCH)..."
         
         wget -qO /tmp/main.tar.gz "$MIRROR_BASE/main/$ARCH/APKINDEX.tar.gz" 2>/dev/null
         if [ -f /tmp/main.tar.gz ]; then
@@ -95,11 +99,9 @@ install_pkg() {
     # Install dependencies if present
     if [ -n "$DEPS" ]; then
         for dep in $DEPS; do
-            # Skip library dependencies like so:libc.musl-x86_64.so.1 or cmd:...
             case "$dep" in
                 so:*|cmd:*|pc:*) continue ;;
             esac
-            # Remove version constraints if present e.g. dep>=1.0
             dep_name=$(echo "$dep" | sed -E 's/[<>=].*//')
             if [ -n "$dep_name" ] && [ "$dep_name" != "$PKG" ]; then
                 echo "Installing dependency: $dep_name for $PKG..."
@@ -158,7 +160,7 @@ case "$1" in
         if [ -z "$QUERY" ]; then usage; fi
         fetch_index 0
         echo "Search results for '$QUERY':"
-        grep -i "^P:$QUERY" /tmp/APKINDEX_main /tmp/APKINDEX_comm 2>/dev/null | cut -d':' -f2 | sort -u
+        grep -hi "^P:.*$QUERY" /tmp/APKINDEX_main /tmp/APKINDEX_comm 2>/dev/null | cut -d':' -f2 | sort -u
         ;;
 
     *)
