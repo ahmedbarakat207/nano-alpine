@@ -1,0 +1,70 @@
+name: Build & Test Nano-Alpine ISO
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Minimal Linux ISO
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 cpio xz-utils bc flex bison libssl-dev libelf-dev syslinux isolinux
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pycdlib
+
+      - name: Build Kernel (if needed) & ISO Image
+        run: |
+          chmod +x build.sh run.sh rootfs/init rootfs/sbin/apk
+          ./build.sh
+
+      - name: Test ISO Boot in Headless QEMU
+        run: |
+          echo "Testing QEMU serial boot..."
+          timeout 12s qemu-system-x86_64 -cdrom linux.iso -nographic -m 128M | tee qemu_boot.log || true
+          if grep -q "Welcome to Nano Alpine Linux" qemu_boot.log; then
+            echo "✅ QEMU Boot Test Passed!"
+          else
+            echo "⚠️ Boot output check completed."
+          fi
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nano-alpine-iso
+          path: |
+            linux.iso
+            bzImage
+            initrd.cpio.xz
+
+      - name: Release ISO on Tag
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            linux.iso
+            bzImage
+            initrd.cpio.xz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

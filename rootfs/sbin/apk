@@ -1,5 +1,5 @@
 #!/bin/sh
-# Zero-dependency APK package manager for Alpine Linux
+# Lightweight zero-dependency APK package manager for Alpine Linux
 
 DB_DIR="/var/lib/apk_mini"
 DB_INSTALLED="$DB_DIR/installed"
@@ -10,15 +10,117 @@ mkdir -p "$DB_DIR" /tmp 2>/dev/null
 touch "$DB_INSTALLED" 2>/dev/null
 
 usage() {
-    echo "Usage: apk <add|del|list> [package_name]"
+    echo "Usage: apk <add|del|list|update|search> [package_name]"
     exit 1
 }
 
 fetch_index() {
-    if [ ! -f /tmp/APKINDEX_main ] || [ ! -f /tmp/APKINDEX_comm ]; then
-        echo "Updating package index..."
-        wget -qO- "$MIRROR_BASE/main/$ARCH/APKINDEX.tar.gz" | tar -xz -C /tmp 2>/dev/null && mv /tmp/APKINDEX /tmp/APKINDEX_main 2>/dev/null
-        wget -qO- "$MIRROR_BASE/community/$ARCH/APKINDEX.tar.gz" | tar -xz -C /tmp 2>/dev/null && mv /tmp/APKINDEX /tmp/APKINDEX_comm 2>/dev/null
+    FORCE="$1"
+    if [ "$FORCE" = "1" ] || [ ! -s /tmp/APKINDEX_main ] || [ ! -s /tmp/APKINDEX_comm ]; then
+        echo "Updating Alpine package indices..."
+        
+        wget -qO /tmp/main.tar.gz "$MIRROR_BASE/main/$ARCH/APKINDEX.tar.gz" 2>/dev/null
+        if [ -f /tmp/main.tar.gz ]; then
+            tar -xzf /tmp/main.tar.gz -C /tmp 2>/dev/null && mv /tmp/APKINDEX /tmp/APKINDEX_main 2>/dev/null
+            rm -f /tmp/main.tar.gz
+        fi
+
+        wget -qO /tmp/comm.tar.gz "$MIRROR_BASE/community/$ARCH/APKINDEX.tar.gz" 2>/dev/null
+        if [ -f /tmp/comm.tar.gz ]; then
+            tar -xzf /tmp/comm.tar.gz -C /tmp 2>/dev/null && mv /tmp/APKINDEX /tmp/APKINDEX_comm 2>/dev/null
+            rm -f /tmp/comm.tar.gz
+        fi
+        
+        if [ ! -s /tmp/APKINDEX_main ] && [ ! -s /tmp/APKINDEX_comm ]; then
+            echo "Warning: Could not fetch package indices. Check network connection."
+        fi
+    fi
+}
+
+install_pkg() {
+    PKG="$1"
+    
+    if grep -q "^$PKG$" "$DB_INSTALLED" 2>/dev/null; then
+        echo "Package '$PKG' is already installed."
+        return 0
+    fi
+
+    if [ -f "$PKG" ]; then
+        echo "Installing local package file $PKG..."
+        tar -xzf "$PKG" -C / 2>/dev/null || tar -xf "$PKG" -C / 2>/dev/null
+        echo "$PKG" >> "$DB_INSTALLED"
+        echo "Successfully installed $PKG!"
+        return 0
+    fi
+
+    fetch_index 0
+
+    REPO=""
+    VER=""
+    DEPS=""
+
+    # Look in community repository first
+    INFO=$(awk -v pkg="$PKG" '
+        $0=="P:"pkg {found=1; next}
+        found && /^P:/ {exit}
+        found && /^V:/ {ver=substr($0, 3)}
+        found && /^D:/ {deps=substr($0, 3)}
+        END {if (found) print ver "|" deps}
+    ' /tmp/APKINDEX_comm 2>/dev/null)
+
+    if [ -n "$INFO" ]; then
+        REPO="community"
+        VER=$(echo "$INFO" | cut -d'|' -f1)
+        DEPS=$(echo "$INFO" | cut -d'|' -f2)
+    else
+        INFO=$(awk -v pkg="$PKG" '
+            $0=="P:"pkg {found=1; next}
+            found && /^P:/ {exit}
+            found && /^V:/ {ver=substr($0, 3)}
+            found && /^D:/ {deps=substr($0, 3)}
+            END {if (found) print ver "|" deps}
+        ' /tmp/APKINDEX_main 2>/dev/null)
+        if [ -n "$INFO" ]; then
+            REPO="main"
+            VER=$(echo "$INFO" | cut -d'|' -f1)
+            DEPS=$(echo "$INFO" | cut -d'|' -f2)
+        fi
+    fi
+
+    if [ -z "$VER" ]; then
+        echo "Error: Package '$PKG' not found in Alpine repositories."
+        return 1
+    fi
+
+    # Install dependencies if present
+    if [ -n "$DEPS" ]; then
+        for dep in $DEPS; do
+            # Skip library dependencies like so:libc.musl-x86_64.so.1 or cmd:...
+            case "$dep" in
+                so:*|cmd:*|pc:*) continue ;;
+            esac
+            # Remove version constraints if present e.g. dep>=1.0
+            dep_name=$(echo "$dep" | sed -E 's/[<>=].*//')
+            if [ -n "$dep_name" ] && [ "$dep_name" != "$PKG" ]; then
+                echo "Installing dependency: $dep_name for $PKG..."
+                install_pkg "$dep_name"
+            fi
+        done
+    fi
+
+    URL="$MIRROR_BASE/$REPO/$ARCH/${PKG}-${VER}.apk"
+    echo "Downloading & installing $PKG ($VER)..."
+
+    wget -qO /tmp/pkg.tar.gz "$URL" 2>/dev/null
+    if [ $? -eq 0 ] && [ -s /tmp/pkg.tar.gz ]; then
+        tar -xzf /tmp/pkg.tar.gz -C / 2>/dev/null
+        rm -f /tmp/pkg.tar.gz /.PKGINFO /.SIGN* 2>/dev/null
+        echo "$PKG" >> "$DB_INSTALLED"
+        echo "Successfully installed $PKG ($VER)!"
+    else
+        echo "Error: Failed to download $PKG from $URL"
+        rm -f /tmp/pkg.tar.gz 2>/dev/null
+        return 1
     fi
 }
 
@@ -26,50 +128,13 @@ case "$1" in
     add)
         PKG="$2"
         if [ -z "$PKG" ]; then usage; fi
-
-        if [ -f "$PKG" ]; then
-            echo "Installing local package $PKG..."
-            tar -xzf "$PKG" -C / 2>/dev/null || tar -xf "$PKG" -C / 2>/dev/null
-            echo "$PKG" >> "$DB_INSTALLED"
-            echo "Successfully installed $PKG!"
-            exit 0
-        fi
-
-        fetch_index
-
-        REPO=""
-        VER=$(awk -v pkg="$PKG" '$0=="P:"pkg {found=1; next} found && /^V:/ {sub(/^V:/,""); print $0; exit}' /tmp/APKINDEX_comm)
-        if [ -n "$VER" ]; then
-            REPO="community"
-        else
-            VER=$(awk -v pkg="$PKG" '$0=="P:"pkg {found=1; next} found && /^V:/ {sub(/^V:/,""); print $0; exit}' /tmp/APKINDEX_main)
-            if [ -n "$VER" ]; then REPO="main"; fi
-        fi
-
-        if [ -z "$VER" ]; then
-            echo "Error: Package '$PKG' not found in Alpine repositories."
-            exit 1
-        fi
-
-        URL="$MIRROR_BASE/$REPO/$ARCH/${PKG}-${VER}.apk"
-        echo "Downloading & installing $PKG ($VER)..."
-
-        wget -qO /tmp/pkg.tar.gz "$URL"
-        if [ $? -eq 0 ]; then
-            tar -xzf /tmp/pkg.tar.gz -C / 2>/dev/null
-            rm -f /tmp/pkg.tar.gz
-            grep -q "^$PKG$" "$DB_INSTALLED" 2>/dev/null || echo "$PKG" >> "$DB_INSTALLED"
-            echo "Successfully installed $PKG ($VER)!"
-        else
-            echo "Error: Failed to download $PKG from $URL"
-            exit 1
-        fi
+        install_pkg "$PKG"
         ;;
 
     del|remove)
         PKG="$2"
         if [ -z "$PKG" ]; then usage; fi
-        echo "Removing $PKG..."
+        echo "Removing package $PKG..."
         sed -i "/^$PKG$/d" "$DB_INSTALLED" 2>/dev/null
         echo "Removed $PKG."
         ;;
@@ -81,6 +146,19 @@ case "$1" in
         else
             echo " (none)"
         fi
+        ;;
+
+    update)
+        fetch_index 1
+        echo "Package indices updated."
+        ;;
+
+    search)
+        QUERY="$2"
+        if [ -z "$QUERY" ]; then usage; fi
+        fetch_index 0
+        echo "Search results for '$QUERY':"
+        grep -i "^P:$QUERY" /tmp/APKINDEX_main /tmp/APKINDEX_comm 2>/dev/null | cut -d':' -f2 | sort -u
         ;;
 
     *)
