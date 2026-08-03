@@ -1,5 +1,5 @@
 #!/bin/sh
-# Exact Neofetch for Alpine Linux with actual RAM calculation
+# Exact Neofetch for Alpine Linux with actual Host, RAM, and Kernel detection
 
 BLUE='\033[1;34m'
 CYAN='\033[1;36m'
@@ -11,6 +11,30 @@ USER_NAME="$(whoami 2>/dev/null || echo root)"
 HOST_NAME="$(hostname 2>/dev/null || echo nano-alpine)"
 KERNEL="$(uname -r 2>/dev/null)"
 
+# Detect Actual Host Hardware / System Model
+HOST_MODEL=""
+if [ -f /sys/devices/virtual/dmi/id/product_name ]; then
+    PRODUCT=$(cat /sys/devices/virtual/dmi/id/product_name 2>/dev/null)
+    VENDOR=$(cat /sys/devices/virtual/dmi/id/sys_vendor 2>/dev/null)
+    if [ -n "$VENDOR" ] && ! echo "$PRODUCT" | grep -qi "$VENDOR"; then
+        HOST_MODEL="$VENDOR $PRODUCT"
+    else
+        HOST_MODEL="$PRODUCT"
+    fi
+elif [ -f /sys/class/dmi/id/product_name ]; then
+    PRODUCT=$(cat /sys/class/dmi/id/product_name 2>/dev/null)
+    VENDOR=$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null)
+    if [ -n "$VENDOR" ] && ! echo "$PRODUCT" | grep -qi "$VENDOR"; then
+        HOST_MODEL="$VENDOR $PRODUCT"
+    else
+        HOST_MODEL="$PRODUCT"
+    fi
+elif [ -f /proc/device-tree/model ]; then
+    HOST_MODEL=$(tr -d '\0' < /proc/device-tree/model 2>/dev/null)
+fi
+[ -z "$HOST_MODEL" ] && HOST_MODEL="QEMU Standard PC (i440FX + PIIX, 1996)"
+
+# Memory calculation
 MEM_STR=""
 if command -v free >/dev/null 2>&1; then
     MEM_STR=$(free -m 2>/dev/null | awk '/Mem:/ {print $3"MiB / "$2"MiB"}')
@@ -77,7 +101,7 @@ CB2="\033[100m   \033[101m   \033[102m   \033[103m   \033[104m   \033[105m   \03
 printf "${BLUE}       .hddddddddddddddddddddddh.       ${RESET}%b\n" "$USER_HOST"
 printf "${BLUE}     :dddddddddddddddddddddddddddd:     ${RESET}%s\n" "$DASHES"
 printf "${BLUE}    /dddddddddddddddddddddddddddddd/    ${RESET}${BOLD}${BLUE}OS${RESET}: Alpine Linux x86_64\n"
-printf "${BLUE}   +dddddddddddddddddddddddddddddddd+   ${RESET}${BOLD}${BLUE}Host${RESET}: QEMU Standard PC (i440FX + PIIX, 1996)\n"
+printf "${BLUE}   +dddddddddddddddddddddddddddddddd+   ${RESET}${BOLD}${BLUE}Host${RESET}: ${HOST_MODEL}\n"
 printf "${BLUE}  \`sdddddddddddddddddddddddddddddddds\`  ${RESET}${BOLD}${BLUE}Kernel${RESET}: ${KERNEL}\n"
 printf "${BLUE} \`ydddddddddddd++hdddddddddddddddddddy\` ${RESET}${BOLD}${BLUE}Uptime${RESET}: ${UPTIME}\n"
 printf "${BLUE}.hdddddddddd+\`   \`+dddh:-sdddddddddddh. ${RESET}${BOLD}${BLUE}Packages${RESET}: ${PKGS}\n"
