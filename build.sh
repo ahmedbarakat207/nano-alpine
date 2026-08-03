@@ -30,7 +30,15 @@ if [ ! -f bzImage ]; then
     fi
 fi
 
-# 2. Ensure busybox is present in rootfs/bin/busybox
+# 2. Ensure rootfs/ is present; download official fallback tarball if missing
+if [ ! -d rootfs ] || [ ! -f rootfs/init ]; then
+    echo "rootfs/ missing, downloading release fallback rootfs.tar..."
+    curl -sSL -o rootfs.tar https://github.com/ahmedbarakat207/nano-alpine/releases/download/1.8mb/rootfs.tar
+    tar -xf rootfs.tar
+    rm -f rootfs.tar
+fi
+
+# 3. Ensure busybox is present in rootfs/bin/busybox
 if [ ! -f rootfs/bin/busybox ]; then
     echo "Downloading static busybox into rootfs/bin/busybox..."
     mkdir -p rootfs/bin
@@ -41,13 +49,13 @@ fi
 # Ensure permissions
 chmod +x rootfs/init rootfs/sbin/apk rootfs/usr/bin/neofetch rootfs/bin/busybox 2>/dev/null || true
 
-# 3. Compress rootfs initramfs (XZ)
+# 4. Compress rootfs initramfs (XZ)
 echo "Compressing initramfs from rootfs/..."
 cd rootfs
 find . -print0 | cpio --null -ov --format=newc | xz -9 --extreme --check=crc32 > ../initrd.cpio.xz
 cd "$SCRIPT_DIR"
 
-# 4. Download syslinux bootloader files locally if not present in system or local cache
+# 5. Download syslinux bootloader files locally if not present in system or local cache
 mkdir -p .syslinux
 if [ ! -f .syslinux/isolinux.bin ] || [ ! -f .syslinux/ldlinux.c32 ]; then
     if [ -f /usr/lib/ISOLINUX/isolinux.bin ] && [ -f /usr/lib/syslinux/modules/bios/ldlinux.c32 ]; then
@@ -61,7 +69,7 @@ if [ ! -f .syslinux/isolinux.bin ] || [ ! -f .syslinux/ldlinux.c32 ]; then
     fi
 fi
 
-# 5. Build ISO
+# 6. Build ISO
 echo "Generating bootable ISO image..."
 python3 make_iso.py
 
