@@ -1,0 +1,66 @@
+#!/bin/sh
+# Minimal zero-dependency Neofetch for Nano Alpine Linux
+
+BLUE='\033[1;34m'
+CYAN='\033[1;36m'
+WHITE='\033[1;37m'
+BOLD='\033[1m'
+RESET='\033[0m'
+
+USER_NAME="$(whoami 2>/dev/null || echo root)"
+HOST_NAME="$(hostname 2>/dev/null || echo nano-alpine)"
+KERNEL="$(uname -r 2>/dev/null)"
+
+if [ -f /proc/meminfo ]; then
+    MEM_TOTAL_KB=$(awk '/MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null)
+    MEM_FREE_KB=$(awk '/MemAvailable:/ {print $2}' /proc/meminfo 2>/dev/null)
+    if [ -z "$MEM_FREE_KB" ]; then
+        MEM_FREE_KB=$(awk '/MemFree:/ {print $2}' /proc/meminfo 2>/dev/null)
+    fi
+    MEM_USED_MB=$(( (MEM_TOTAL_KB - MEM_FREE_KB) / 1024 ))
+    MEM_TOTAL_MB=$(( MEM_TOTAL_KB / 1024 ))
+    MEM_STR="${MEM_USED_MB}MiB / ${MEM_TOTAL_MB}MiB"
+else
+    MEM_STR="128MiB"
+fi
+
+if [ -f /proc/uptime ]; then
+    UP_SECS=$(cut -d. -f1 /proc/uptime)
+    UP_MINS=$(( (UP_SECS / 60) % 60 ))
+    UP_HOURS=$(( (UP_SECS / 3600) % 24 ))
+    UP_DAYS=$(( UP_SECS / 86400 ))
+    UPTIME=""
+    [ $UP_DAYS -gt 0 ] && UPTIME="${UP_DAYS}d "
+    [ $UP_HOURS -gt 0 ] && UPTIME="${UPTIME}${UP_HOURS}h "
+    UPTIME="${UPTIME}${UP_MINS}m"
+else
+    UPTIME="0m"
+fi
+
+PKGS="0 (apk-mini)"
+if [ -f /var/lib/apk_mini/installed ]; then
+    NUM_PKGS=$(grep -c '.' /var/lib/apk_mini/installed 2>/dev/null || echo 0)
+    PKGS="${NUM_PKGS} (apk-mini)"
+fi
+
+USER_HOST="${BOLD}${BLUE}${USER_NAME}${RESET}${BOLD}@${RESET}${BOLD}${BLUE}${HOST_NAME}${RESET}"
+LINE_LEN=$(echo "${USER_NAME}@${HOST_NAME}" | wc -c)
+DASHES=""
+i=1
+while [ $i -lt $LINE_LEN ]; do
+    DASHES="${DASHES}-"
+    i=$((i + 1))
+done
+
+printf "       ${BLUE}/\\${RESET}        %b\n" "$USER_HOST"
+printf "      ${BLUE}/  \\${RESET}       %s\n" "$DASHES"
+printf "     ${BLUE}/ ${WHITE}/\\${BLUE} \\${RESET}      ${BOLD}${BLUE}OS${RESET}: Alpine Linux x86_64\n"
+printf "    ${BLUE}/ ${WHITE}/  \\${BLUE} \\${RESET}     ${BOLD}${BLUE}Host${RESET}: QEMU Standard PC (i440FX + PIIX, 1996)\n"
+printf "   ${BLUE}/ ${WHITE}/    \\${BLUE} \\${RESET}    ${BOLD}${BLUE}Kernel${RESET}: ${KERNEL}\n"
+printf "  ${BLUE}/ ${WHITE}/      \\${BLUE} \\${RESET}   ${BOLD}${BLUE}Uptime${RESET}: ${UPTIME}\n"
+printf " / ${WHITE}/        \\${BLUE} \\${RESET}  ${BOLD}${BLUE}Packages${RESET}: ${PKGS}\n"
+printf "${BLUE}/ ${WHITE}/          \\${BLUE} \\${RESET} ${BOLD}${BLUE}Shell${RESET}: sh\n"
+printf "${BLUE}\\/            \\/${RESET} ${BOLD}${BLUE}Memory${RESET}: ${MEM_STR}\n"
+printf "\n"
+printf "   \033[40m   \033[41m   \033[42m   \033[43m   \033[44m   \033[45m   \033[46m   \033[47m   \033[0m\n"
+printf "   \033[100m   \033[101m   \033[102m   \033[103m   \033[104m   \033[105m   \033[106m   \033[107m   \033[0m\n"

@@ -26,17 +26,12 @@ ifconfig lo 127.0.0.1 up 2>/dev/null || ip link set lo up 2>/dev/null
     }
 ) &
 
-echo "=========================================================="
-echo "          🚀 Welcome to Nano Alpine Linux 🚀             "
-echo "  Minimalist distribution with custom rootfs & mini apk   "
-echo "=========================================================="
-echo " Hostname : $(hostname)"
-echo " Kernel   : $(uname -r)"
-echo " Memory   : $(free -m 2>/dev/null | awk '/Mem:/ {print $2" MB"}')"
-echo " Shell    : /bin/sh"
-echo " Package  : apk <add|del|list>"
-echo "=========================================================="
-echo ""
+# Display Alpine Neofetch screen
+if [ -x /usr/bin/neofetch ]; then
+    /usr/bin/neofetch
+elif [ -x /bin/neofetch ]; then
+    /bin/neofetch
+fi
 
 # Loop shell with cttyhack so exiting shell doesn't panic the kernel
 while true; do

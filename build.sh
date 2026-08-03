@@ -37,16 +37,17 @@ mkdir -p static_rootfs/{bin,dev,etc,proc,sys,tmp,sbin,usr/bin,usr/sbin,var/lib/a
 
 cp busybox-static static_rootfs/bin/busybox
 chmod +x static_rootfs/bin/busybox
-cp rootfs/init static_rootfs/init
-cp rootfs/sbin/apk static_rootfs/sbin/apk
-cp rootfs/etc/resolv.conf static_rootfs/etc/resolv.conf
-chmod +x static_rootfs/init static_rootfs/sbin/apk
 
-# Symlink core shell tools
+# Copy all custom rootfs files recursively
+cp -r rootfs/* static_rootfs/
+chmod +x static_rootfs/init static_rootfs/sbin/apk static_rootfs/usr/bin/neofetch 2>/dev/null || true
+
+# Symlink core shell tools & neofetch
 cd static_rootfs/bin
 for app in sh ls cat echo cp mv rm mkdir rmdir mount umount ps kill vi tar gzip gunzip zcat grep egrep fgrep sed awk wget ping cttyhack clear dmesg reboot halt poweroff touch chmod chown find xargs head tail wc cut tr uniq sort env pwd uname hostname id whoami date uptime sleep sync ip ifconfig udhcpc route; do
     ln -s busybox $app 2>/dev/null || true
 done
+ln -s ../usr/bin/neofetch neofetch 2>/dev/null || true
 cd "$SCRIPT_DIR"
 
 # 4. Compress initramfs
