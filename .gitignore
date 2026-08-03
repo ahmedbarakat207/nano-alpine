@@ -1,7 +1,9 @@
 # Build artifacts
 bzImage
+bzImage_i386
 initrd.cpio.xz
 linux.iso
+linux_i386.iso
 busybox-static
 rootfs/bin/busybox
 .syslinux/

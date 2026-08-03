@@ -33,7 +33,11 @@ ldlinux_candidates = [
 isolinux_bin = find_file(isolinux_candidates, "isolinux.bin")
 ldlinux_c32 = find_file(ldlinux_candidates, "ldlinux.c32")
 
-bzimage_path = os.path.join(ROOT_DIR, "bzImage")
+kernel_bin_name = os.environ.get("KERNEL_BIN", "bzImage")
+if not os.path.exists(os.path.join(ROOT_DIR, kernel_bin_name)) and os.path.exists(os.path.join(ROOT_DIR, "bzImage_i386")):
+    kernel_bin_name = "bzImage_i386"
+
+bzimage_path = os.path.join(ROOT_DIR, kernel_bin_name)
 initrd_path = os.path.join(ROOT_DIR, "initrd.cpio.xz")
 output_iso_path = os.path.join(ROOT_DIR, "linux.iso")
 
