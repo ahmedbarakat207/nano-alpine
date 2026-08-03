@@ -3,7 +3,7 @@ bzImage
 initrd.cpio.xz
 linux.iso
 busybox-static
-static_rootfs/
+rootfs/bin/busybox
 .syslinux/
 linux-7.1.6/
 alpine-minirootfs-*.tar.gz

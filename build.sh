@@ -6,7 +6,7 @@ cd "$SCRIPT_DIR"
 
 if [ "$1" = "clean" ] || [ "$1" = "--clean" ]; then
     echo "Cleaning build artifacts..."
-    rm -rf static_rootfs .syslinux initrd.cpio.xz linux.iso busybox-static rootfs.tar *.log
+    rm -rf .syslinux initrd.cpio.xz linux.iso *.log
     echo "Clean complete."
     exit 0
 fi
@@ -30,40 +30,24 @@ if [ ! -f bzImage ]; then
     fi
 fi
 
-# 2. Download Static Busybox if missing
-if [ ! -f busybox-static ]; then
-    echo "Downloading static busybox..."
-    curl -sSL -o busybox-static https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox
-    chmod +x busybox-static
+# 2. Ensure busybox is present in rootfs/bin/busybox
+if [ ! -f rootfs/bin/busybox ]; then
+    echo "Downloading static busybox into rootfs/bin/busybox..."
+    mkdir -p rootfs/bin
+    curl -sSL -o rootfs/bin/busybox https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox
+    chmod +x rootfs/bin/busybox
 fi
 
-# 3. Prepare RootFS using custom rootfs/ files
-echo "Preparing static rootfs..."
-rm -rf static_rootfs
-mkdir -p static_rootfs/{bin,dev,etc,proc,sys,tmp,sbin,usr/bin,usr/sbin,var/lib/apk_mini}
+# Ensure permissions
+chmod +x rootfs/init rootfs/sbin/apk rootfs/usr/bin/neofetch rootfs/bin/busybox 2>/dev/null || true
 
-cp busybox-static static_rootfs/bin/busybox
-chmod +x static_rootfs/bin/busybox
-
-# Copy all custom rootfs files recursively
-cp -r rootfs/* static_rootfs/
-chmod +x static_rootfs/init static_rootfs/sbin/apk static_rootfs/usr/bin/neofetch 2>/dev/null || true
-
-# Symlink core shell tools & neofetch
-cd static_rootfs/bin
-for app in sh ls cat echo cp mv rm mkdir rmdir mount umount ps kill vi tar gzip gunzip zcat grep egrep fgrep sed awk wget ping cttyhack clear dmesg reboot halt poweroff touch chmod chown find xargs head tail wc cut tr uniq sort env pwd uname hostname id whoami date uptime sleep sync ip ifconfig udhcpc route free; do
-    ln -s busybox $app 2>/dev/null || true
-done
-ln -s ../usr/bin/neofetch neofetch 2>/dev/null || true
-cd "$SCRIPT_DIR"
-
-# 4. Compress initramfs
-echo "Compressing initramfs (XZ)..."
-cd static_rootfs
+# 3. Compress rootfs initramfs (XZ)
+echo "Compressing initramfs from rootfs/..."
+cd rootfs
 find . -print0 | cpio --null -ov --format=newc | xz -9 --extreme --check=crc32 > ../initrd.cpio.xz
 cd "$SCRIPT_DIR"
 
-# 5. Download syslinux bootloader files locally if not present in system or local cache
+# 4. Download syslinux bootloader files locally if not present in system or local cache
 mkdir -p .syslinux
 if [ ! -f .syslinux/isolinux.bin ] || [ ! -f .syslinux/ldlinux.c32 ]; then
     if [ -f /usr/lib/ISOLINUX/isolinux.bin ] && [ -f /usr/lib/syslinux/modules/bios/ldlinux.c32 ]; then
@@ -77,7 +61,7 @@ if [ ! -f .syslinux/isolinux.bin ] || [ ! -f .syslinux/ldlinux.c32 ]; then
     fi
 fi
 
-# 6. Build ISO
+# 5. Build ISO
 echo "Generating bootable ISO image..."
 python3 make_iso.py
 
