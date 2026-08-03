@@ -1,5 +1,5 @@
 #!/bin/sh
-# Exact Neofetch for Alpine Linux
+# Exact Neofetch for Alpine Linux with actual RAM calculation
 
 BLUE='\033[1;34m'
 CYAN='\033[1;36m'
@@ -11,18 +11,35 @@ USER_NAME="$(whoami 2>/dev/null || echo root)"
 HOST_NAME="$(hostname 2>/dev/null || echo nano-alpine)"
 KERNEL="$(uname -r 2>/dev/null)"
 
-if [ -f /proc/meminfo ]; then
-    MEM_TOTAL_KB=$(awk '/MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null)
-    MEM_FREE_KB=$(awk '/MemAvailable:/ {print $2}' /proc/meminfo 2>/dev/null)
-    if [ -z "$MEM_FREE_KB" ]; then
-        MEM_FREE_KB=$(awk '/MemFree:/ {print $2}' /proc/meminfo 2>/dev/null)
+MEM_STR=""
+if command -v free >/dev/null 2>&1; then
+    MEM_STR=$(free -m 2>/dev/null | awk '/Mem:/ {print $3"MiB / "$2"MiB"}')
+fi
+
+if [ -z "$MEM_STR" ] && [ -f /proc/meminfo ]; then
+    MEM_TOTAL_KB=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null)
+    MEM_AVAIL_KB=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo 2>/dev/null)
+    MEM_FREE_KB=$(awk '/^MemFree:/ {print $2}' /proc/meminfo 2>/dev/null)
+    MEM_BUFF_KB=$(awk '/^Buffers:/ {print $2}' /proc/meminfo 2>/dev/null)
+    MEM_CACHE_KB=$(awk '/^Cached:/ {print $2}' /proc/meminfo 2>/dev/null)
+
+    MEM_BUFF_KB=${MEM_BUFF_KB:-0}
+    MEM_CACHE_KB=${MEM_CACHE_KB:-0}
+
+    if [ -n "$MEM_AVAIL_KB" ] && [ "$MEM_AVAIL_KB" -gt 0 ]; then
+        MEM_USED_KB=$(( MEM_TOTAL_KB - MEM_AVAIL_KB ))
+    else
+        MEM_USED_KB=$(( MEM_TOTAL_KB - MEM_FREE_KB - MEM_BUFF_KB - MEM_CACHE_KB ))
     fi
-    MEM_USED_MB=$(( (MEM_TOTAL_KB - MEM_FREE_KB) / 1024 ))
+
+    [ "$MEM_USED_KB" -lt 0 ] && MEM_USED_KB=$(( MEM_TOTAL_KB - MEM_FREE_KB ))
+
+    MEM_USED_MB=$(( MEM_USED_KB / 1024 ))
     MEM_TOTAL_MB=$(( MEM_TOTAL_KB / 1024 ))
     MEM_STR="${MEM_USED_MB}MiB / ${MEM_TOTAL_MB}MiB"
-else
-    MEM_STR="128MiB / 128MiB"
 fi
+
+[ -z "$MEM_STR" ] && MEM_STR="24MiB / 128MiB"
 
 if [ -f /proc/uptime ]; then
     UP_SECS=$(cut -d. -f1 /proc/uptime)
