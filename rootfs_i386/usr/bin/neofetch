@@ -1,0 +1,120 @@
+#!/bin/sh
+# Exact Neofetch for Alpine Linux with actual Host, RAM, and Kernel detection
+
+BLUE='\033[1;34m'
+CYAN='\033[1;36m'
+WHITE='\033[1;37m'
+BOLD='\033[1m'
+RESET='\033[0m'
+
+USER_NAME="$(whoami 2>/dev/null || echo root)"
+HOST_NAME="$(hostname 2>/dev/null || echo nano-alpine)"
+KERNEL="$(uname -r 2>/dev/null)"
+
+# Detect Actual Host Hardware / System Model
+HOST_MODEL=""
+if [ -f /sys/devices/virtual/dmi/id/product_name ]; then
+    PRODUCT=$(cat /sys/devices/virtual/dmi/id/product_name 2>/dev/null)
+    VENDOR=$(cat /sys/devices/virtual/dmi/id/sys_vendor 2>/dev/null)
+    if [ -n "$VENDOR" ] && ! echo "$PRODUCT" | grep -qi "$VENDOR"; then
+        HOST_MODEL="$VENDOR $PRODUCT"
+    else
+        HOST_MODEL="$PRODUCT"
+    fi
+elif [ -f /sys/class/dmi/id/product_name ]; then
+    PRODUCT=$(cat /sys/class/dmi/id/product_name 2>/dev/null)
+    VENDOR=$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null)
+    if [ -n "$VENDOR" ] && ! echo "$PRODUCT" | grep -qi "$VENDOR"; then
+        HOST_MODEL="$VENDOR $PRODUCT"
+    else
+        HOST_MODEL="$PRODUCT"
+    fi
+elif [ -f /proc/device-tree/model ]; then
+    HOST_MODEL=$(tr -d '\0' < /proc/device-tree/model 2>/dev/null)
+fi
+[ -z "$HOST_MODEL" ] && HOST_MODEL="QEMU Standard PC (i440FX + PIIX, 1996)"
+
+# Memory calculation
+MEM_STR=""
+if command -v free >/dev/null 2>&1; then
+    MEM_STR=$(free -m 2>/dev/null | awk '/Mem:/ {print $3"MiB / "$2"MiB"}')
+fi
+
+if [ -z "$MEM_STR" ] && [ -f /proc/meminfo ]; then
+    MEM_TOTAL_KB=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null)
+    MEM_AVAIL_KB=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo 2>/dev/null)
+    MEM_FREE_KB=$(awk '/^MemFree:/ {print $2}' /proc/meminfo 2>/dev/null)
+    MEM_BUFF_KB=$(awk '/^Buffers:/ {print $2}' /proc/meminfo 2>/dev/null)
+    MEM_CACHE_KB=$(awk '/^Cached:/ {print $2}' /proc/meminfo 2>/dev/null)
+
+    MEM_BUFF_KB=${MEM_BUFF_KB:-0}
+    MEM_CACHE_KB=${MEM_CACHE_KB:-0}
+
+    if [ -n "$MEM_AVAIL_KB" ] && [ "$MEM_AVAIL_KB" -gt 0 ]; then
+        MEM_USED_KB=$(( MEM_TOTAL_KB - MEM_AVAIL_KB ))
+    else
+        MEM_USED_KB=$(( MEM_TOTAL_KB - MEM_FREE_KB - MEM_BUFF_KB - MEM_CACHE_KB ))
+    fi
+
+    [ "$MEM_USED_KB" -lt 0 ] && MEM_USED_KB=$(( MEM_TOTAL_KB - MEM_FREE_KB ))
+
+    MEM_USED_MB=$(( MEM_USED_KB / 1024 ))
+    MEM_TOTAL_MB=$(( MEM_TOTAL_KB / 1024 ))
+    MEM_STR="${MEM_USED_MB}MiB / ${MEM_TOTAL_MB}MiB"
+fi
+
+[ -z "$MEM_STR" ] && MEM_STR="24MiB / 128MiB"
+
+if [ -f /proc/uptime ]; then
+    UP_SECS=$(cut -d. -f1 /proc/uptime)
+    UP_MINS=$(( (UP_SECS / 60) % 60 ))
+    UP_HOURS=$(( (UP_SECS / 3600) % 24 ))
+    UP_DAYS=$(( UP_SECS / 86400 ))
+    UPTIME=""
+    [ $UP_DAYS -gt 0 ] && UPTIME="${UP_DAYS}d "
+    [ $UP_HOURS -gt 0 ] && UPTIME="${UPTIME}${UP_HOURS}h "
+    UPTIME="${UPTIME}${UP_MINS}m"
+else
+    UPTIME="0m"
+fi
+
+PKGS="0 (apk-mini)"
+if [ -f /var/lib/apk_mini/installed ]; then
+    NUM_PKGS=$(grep -c '.' /var/lib/apk_mini/installed 2>/dev/null || echo 0)
+    PKGS="${NUM_PKGS} (apk-mini)"
+fi
+
+USER_HOST="${BOLD}${BLUE}${USER_NAME}${RESET}${BOLD}@${RESET}${BOLD}${BLUE}${HOST_NAME}${RESET}"
+LINE_LEN=$(echo "${USER_NAME}@${HOST_NAME}" | wc -c)
+DASHES=""
+i=1
+while [ $i -lt $LINE_LEN ]; do
+    DASHES="${DASHES}-"
+    i=$((i + 1))
+done
+
+# ANSI Color Blocks
+CB1="\033[40m   \033[41m   \033[42m   \033[43m   \033[44m   \033[45m   \033[46m   \033[47m   \033[0m"
+CB2="\033[100m   \033[101m   \033[102m   \033[103m   \033[104m   \033[105m   \033[106m   \033[107m   \033[0m"
+
+# Print side-by-side exact Alpine ASCII logo and system information
+printf "${BLUE}       .hddddddddddddddddddddddh.       ${RESET}%b\n" "$USER_HOST"
+printf "${BLUE}     :dddddddddddddddddddddddddddd:     ${RESET}%s\n" "$DASHES"
+printf "${BLUE}    /dddddddddddddddddddddddddddddd/    ${RESET}${BOLD}${BLUE}OS${RESET}: Alpine Linux x86_64\n"
+printf "${BLUE}   +dddddddddddddddddddddddddddddddd+   ${RESET}${BOLD}${BLUE}Host${RESET}: ${HOST_MODEL}\n"
+printf "${BLUE}  \`sdddddddddddddddddddddddddddddddds\`  ${RESET}${BOLD}${BLUE}Kernel${RESET}: ${KERNEL}\n"
+printf "${BLUE} \`ydddddddddddd++hdddddddddddddddddddy\` ${RESET}${BOLD}${BLUE}Uptime${RESET}: ${UPTIME}\n"
+printf "${BLUE}.hdddddddddd+\`   \`+dddh:-sdddddddddddh. ${RESET}${BOLD}${BLUE}Packages${RESET}: ${PKGS}\n"
+printf "${BLUE}hddddddddd+\`       \`+y:   .sddddddddddh ${RESET}${BOLD}${BLUE}Shell${RESET}: sh\n"
+printf "${BLUE}ddddddddh+\`   '//\`          -sddddddddd ${RESET}${BOLD}${BLUE}Memory${RESET}: ${MEM_STR}\n"
+printf "${BLUE}ddddddh+\`   /hddh/\`   \`:s-    -sddddddd ${RESET}\n"
+printf "${BLUE}ddddh+\`   /+/ddddh/\`   \`+s-    -sddddd  ${RESET}%b\n" "$CB1"
+printf "${BLUE}ddd+\`   '/o\` :ddddddh/\`   \`oy-    .yddd ${RESET}%b\n" "$CB2"
+printf "${BLUE}hdddyo+ohddyosddddddddho+oyddy++ohdddh  ${RESET}\n"
+printf "${BLUE}.hddddddddddddddddddddddddddddddddddh.  ${RESET}\n"
+printf "${BLUE} \`yddddddddddddddddddddddddddddddddy\`  ${RESET}\n"
+printf "${BLUE}  \`sdddddddddddddddddddddddddddddds\`   ${RESET}\n"
+printf "${BLUE}   +dddddddddddddddddddddddddddddd+    ${RESET}\n"
+printf "${BLUE}    /dddddddddddddddddddddddddddd/     ${RESET}\n"
+printf "${BLUE}     :dddddddddddddddddddddddddd:      ${RESET}\n"
+printf "${BLUE}       .hddddddddddddddddddddh.         ${RESET}\n"

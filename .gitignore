@@ -6,6 +6,7 @@ linux.iso
 linux_i386.iso
 busybox-static
 rootfs/bin/busybox
+rootfs_i386/bin/busybox
 .syslinux/
 linux-7.1.6/
 alpine-minirootfs-*.tar.gz

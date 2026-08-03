@@ -25,12 +25,14 @@ BZIMAGE_FILE="bzImage"
 CONFIG_FILE="kernel.config"
 BUSYBOX_URL="https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox"
 OUTPUT_ISO="linux.iso"
+ROOTFS_DIR="rootfs"
 
 if [ "$TARGET_ARCH" = "i386" ]; then
     BZIMAGE_FILE="bzImage_i386"
     CONFIG_FILE="kernel_i386.config"
     BUSYBOX_URL="https://busybox.net/downloads/binaries/1.35.0-i686-linux-musl/busybox"
     OUTPUT_ISO="linux_i386.iso"
+    ROOTFS_DIR="rootfs_i386"
 fi
 
 # 1. Ensure kernel bzImage is present
@@ -58,26 +60,36 @@ if [ ! -f "$BZIMAGE_FILE" ]; then
     fi
 fi
 
-# 2. Ensure rootfs/ is present; download release fallback tarball if missing
-if [ ! -d rootfs ] || [ ! -f rootfs/init ]; then
-    echo "rootfs/ missing, downloading release fallback rootfs.tar..."
-    curl -sSL -o rootfs.tar https://github.com/ahmedbarakat207/nano-alpine/releases/download/1.8mb/rootfs.tar
-    tar -xf rootfs.tar
-    rm -f rootfs.tar
+# 2. Ensure rootfs directory is present; download release fallback tarball if missing
+if [ ! -d "$ROOTFS_DIR" ] || [ ! -f "$ROOTFS_DIR/init" ]; then
+    if [ "$TARGET_ARCH" = "i386" ] && [ -d rootfs ]; then
+        echo "Creating rootfs_i386/ from rootfs/..."
+        cp -a rootfs "$ROOTFS_DIR"
+    else
+        echo "$ROOTFS_DIR missing, downloading release fallback rootfs.tar..."
+        curl -sSL -o rootfs.tar https://github.com/ahmedbarakat207/nano-alpine/releases/download/1.8mb/rootfs.tar
+        tar -xf rootfs.tar
+        rm -f rootfs.tar
+        if [ "$ROOTFS_DIR" = "rootfs_i386" ]; then
+            cp -a rootfs "$ROOTFS_DIR"
+        fi
+    fi
 fi
 
-# 3. Ensure arch-appropriate busybox is present in rootfs/bin/busybox
-echo "Downloading $TARGET_ARCH static busybox into rootfs/bin/busybox..."
-mkdir -p rootfs/bin
-curl -sSL -o rootfs/bin/busybox "$BUSYBOX_URL"
-chmod +x rootfs/bin/busybox
+# 3. Ensure arch-appropriate busybox is present in $ROOTFS_DIR/bin/busybox
+if [ ! -f "$ROOTFS_DIR/bin/busybox" ]; then
+    echo "Downloading $TARGET_ARCH static busybox into $ROOTFS_DIR/bin/busybox..."
+    mkdir -p "$ROOTFS_DIR/bin"
+    curl -sSL -o "$ROOTFS_DIR/bin/busybox" "$BUSYBOX_URL"
+    chmod +x "$ROOTFS_DIR/bin/busybox"
+fi
 
 # Ensure permissions
-chmod +x rootfs/init rootfs/sbin/apk rootfs/usr/bin/neofetch rootfs/bin/busybox 2>/dev/null || true
+chmod +x "$ROOTFS_DIR/init" "$ROOTFS_DIR/sbin/apk" "$ROOTFS_DIR/usr/bin/neofetch" "$ROOTFS_DIR/bin/busybox" 2>/dev/null || true
 
 # 4. Compress rootfs initramfs (XZ)
-echo "Compressing initramfs from rootfs/..."
-cd rootfs
+echo "Compressing initramfs from $ROOTFS_DIR/..."
+cd "$ROOTFS_DIR"
 find . -print0 | cpio --null -ov --format=newc | xz -9 --extreme --check=crc32 > ../initrd.cpio.xz
 cd "$SCRIPT_DIR"
 
