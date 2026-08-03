@@ -23,30 +23,31 @@ if [ ! -f bzImage ]; then
     fi
 fi
 
-# 2. Download Alpine Linux Mini RootFS if missing
-ALPINE_TAR=$(ls alpine-minirootfs-*.tar.gz 2>/dev/null | head -n1)
-if [ -z "$ALPINE_TAR" ]; then
-    echo "Downloading Alpine Linux Mini RootFS..."
-    ALPINE_TAR="alpine-minirootfs-3.20.3-x86_64.tar.gz"
-    curl -sSL -o "$ALPINE_TAR" "http://dl-cdn.alpinelinux.org/alpine/v3.20/releases/x86_64/$ALPINE_TAR"
+# 2. Download Static Busybox if missing
+if [ ! -f busybox-static ]; then
+    echo "Downloading static busybox..."
+    curl -sSL -o busybox-static https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox
+    chmod +x busybox-static
 fi
 
-# 3. Prepare RootFS using Alpine minirootfs base
-echo "Preparing Alpine static rootfs..."
+# 3. Prepare RootFS using custom rootfs/ files
+echo "Preparing static rootfs..."
 rm -rf static_rootfs
-mkdir -p static_rootfs
-tar -xzf "$ALPINE_TAR" -C static_rootfs
+mkdir -p static_rootfs/{bin,dev,etc,proc,sys,tmp,sbin,usr/bin,usr/sbin,var/lib/apk_mini}
 
-# Copy custom init, apk package manager, and resolv.conf overlay
+cp busybox-static static_rootfs/bin/busybox
+chmod +x static_rootfs/bin/busybox
 cp rootfs/init static_rootfs/init
 cp rootfs/sbin/apk static_rootfs/sbin/apk
 cp rootfs/etc/resolv.conf static_rootfs/etc/resolv.conf
 chmod +x static_rootfs/init static_rootfs/sbin/apk
 
-# Ensure busybox symlinks for cttyhack if missing
-if [ -f static_rootfs/bin/busybox ] && [ ! -e static_rootfs/bin/cttyhack ]; then
-    ln -s busybox static_rootfs/bin/cttyhack 2>/dev/null || true
-fi
+# Symlink core shell tools
+cd static_rootfs/bin
+for app in sh ls cat echo cp mv rm mkdir rmdir mount umount ps kill vi tar gzip gunzip zcat grep egrep fgrep sed awk wget ping cttyhack clear dmesg reboot halt poweroff touch chmod chown find xargs head tail wc cut tr uniq sort env pwd uname hostname id whoami date uptime sleep sync ip ifconfig udhcpc route; do
+    ln -s busybox $app 2>/dev/null || true
+done
+cd "$SCRIPT_DIR"
 
 # 4. Compress initramfs
 echo "Compressing initramfs (XZ)..."

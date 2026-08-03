@@ -28,7 +28,7 @@ ifconfig lo 127.0.0.1 up 2>/dev/null || ip link set lo up 2>/dev/null
 
 echo "=========================================================="
 echo "          🚀 Welcome to Nano Alpine Linux 🚀             "
-echo "  Minimalist distribution with official Alpine Mini RootFS"
+echo "  Minimalist distribution with custom rootfs & mini apk   "
 echo "=========================================================="
 echo " Hostname : $(hostname)"
 echo " Kernel   : $(uname -r)"
