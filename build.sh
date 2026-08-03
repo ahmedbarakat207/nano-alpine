@@ -15,18 +15,29 @@ echo "=== Building Nano-Alpine Minimal Linux ISO ==="
 
 # 1. Ensure kernel bzImage is present
 if [ ! -f bzImage ]; then
-    echo "bzImage missing, checking kernel sources..."
+    echo "bzImage missing, checking kernel source..."
     if [ -f linux-7.1.6/arch/x86/boot/bzImage ]; then
         cp linux-7.1.6/arch/x86/boot/bzImage bzImage
-    elif [ -f src/linux/arch/x86/boot/bzImage ]; then
-        cp src/linux/arch/x86/boot/bzImage bzImage
-    elif [ -d linux-7.1.6 ]; then
+    else
+        if [ ! -d linux-7.1.6 ]; then
+            echo "Downloading Linux 7.1.6 kernel source..."
+            curl -sSL -o linux-7.1.6.tar.xz https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.1.6.tar.xz
+            tar -xf linux-7.1.6.tar.xz
+            rm -f linux-7.1.6.tar.xz
+        fi
+
+        if [ -f kernel.config ]; then
+            echo "Applying kernel.config to linux-7.1.6/.config..."
+            cp kernel.config linux-7.1.6/.config
+        elif [ -f kernel_config.patch ]; then
+            echo "Applying kernel_config.patch..."
+            patch -p1 -d linux-7.1.6 < kernel_config.patch 2>/dev/null || cp kernel_config.patch linux-7.1.6/.config
+        fi
+
         echo "Building kernel bzImage from linux-7.1.6..."
+        make -C linux-7.1.6 olddefconfig 2>/dev/null || true
         make -C linux-7.1.6 -j$(nproc) bzImage
         cp linux-7.1.6/arch/x86/boot/bzImage bzImage
-    else
-        echo "Error: bzImage not found and no kernel source available to compile."
-        exit 1
     fi
 fi
 
