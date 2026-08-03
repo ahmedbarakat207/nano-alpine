@@ -1,0 +1,16 @@
+# Build artifacts
+bzImage
+initrd.cpio.xz
+linux.iso
+busybox-static
+static_rootfs/
+linux-7.1.6/
+alpine-minirootfs-*.tar.gz
+linux.tar.xz
+*.iso
+*.xz
+*.gz
+__pycache__/
+
+# Linux kernel source submodule build outputs
+src/linux/
