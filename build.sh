@@ -21,18 +21,20 @@ fi
 
 echo "=== Building Nano-Alpine Minimal Linux ISO (${TARGET_ARCH}) ==="
 
-BZIMAGE_FILE="bzImage"
-CONFIG_FILE="kernel.config"
-BUSYBOX_URL="https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox"
-OUTPUT_ISO="linux.iso"
-ROOTFS_DIR="rootfs"
-
 if [ "$TARGET_ARCH" = "i386" ]; then
     BZIMAGE_FILE="bzImage_i386"
     CONFIG_FILE="kernel_i386.config"
     BUSYBOX_URL="https://busybox.net/downloads/binaries/1.35.0-i686-linux-musl/busybox"
     OUTPUT_ISO="linux_i386.iso"
     ROOTFS_DIR="rootfs_i386"
+    ELF_MATCH="Intel i386"
+else
+    BZIMAGE_FILE="bzImage"
+    CONFIG_FILE="kernel.config"
+    BUSYBOX_URL="https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox"
+    OUTPUT_ISO="linux.iso"
+    ROOTFS_DIR="rootfs"
+    ELF_MATCH="x86-64"
 fi
 
 # 1. Ensure kernel bzImage is present
@@ -77,7 +79,7 @@ if [ ! -d "$ROOTFS_DIR" ] || [ ! -f "$ROOTFS_DIR/init" ]; then
 fi
 
 # 3. Ensure arch-appropriate busybox is present in $ROOTFS_DIR/bin/busybox
-if [ ! -f "$ROOTFS_DIR/bin/busybox" ]; then
+if [ ! -f "$ROOTFS_DIR/bin/busybox" ] || ! file "$ROOTFS_DIR/bin/busybox" | grep -q "$ELF_MATCH"; then
     echo "Downloading $TARGET_ARCH static busybox into $ROOTFS_DIR/bin/busybox..."
     mkdir -p "$ROOTFS_DIR/bin"
     curl -sSL -o "$ROOTFS_DIR/bin/busybox" "$BUSYBOX_URL"
